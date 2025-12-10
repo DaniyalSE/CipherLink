@@ -1,37 +1,92 @@
 # CipherLink OS
 
-SecureTerminal is a FastAPI + React stack that simulates a hardened messenger: users sign up with OTP verification, negotiate session keys through a KDC, and exchange AES-encrypted payloads over Socket.IO while every crypto stage is logged for audit.
+CipherLink OS (codename **SecureTerminal**) is an end-to-end encrypted messenger simulator that demonstrates modern key management techniques on top of a FastAPI backend and a Vite/React frontend. Users onboard with OTP verification, negotiate symmetric session keys through a Key Distribution Center (KDC), harden chat sessions with perfect forward secrecy (PFS) handshakes, and exchange AES-encrypted messages over Socket.IO while every cryptographic stage is logged for audit.
 
-This doc walks through setup, the WhatsApp-style messaging flow, data persistence expectations, and key troubleshooting tips.
+This README captures the full project story: architecture, directory layout, setup, workflows, APIs, observability, and troubleshooting tips so you can operate or extend the platform quickly.
 
 ---
 
-## 1. Quick Start
+## Platform Overview
 
-### Prerequisites
+- **Backend:** FastAPI, SQLAlchemy, Socket.IO, cryptography primitives, JWT auth, OTP, email hooks.
+- **Frontend:** React + Vite + Tailwind + ShadCN UI, React Query for data fetching, Socket.IO client for realtime flows.
+- **Security Services:**
+	- Key Distribution Center (KDC) that mints shared AES-256 keys per contact.
+	- Key lifecycle manager that rotates, revokes, and destroys session keys.
+	- Perfect Forward Secrecy (PFS) ECDH handshake service for disposable keys.
+- **Observability:** Real-time debug panels, structured websocket events, crypto log streams, blockchain-style append-only records.
 
-- Python 3.11+ with `pip`
+---
+
+## Repository Layout
+
+```text
+backend/
+	main.py                FastAPI entrypoint
+	routes/                REST + websocket endpoints (auth, crypto, system, etc.)
+	kdc/, key_lifecycle/, pfs/   Key management services and models
+	services/socket_manager.py   Socket.IO orchestration + event fan-out
+	utils/                Auth helpers, secure storage, rate limiting
+src/ (frontend)
+	main.tsx, App.tsx     Vite Bootstrap + layout
+	components/           Messaging UI, security dashboards, terminal layout
+	hooks/                React Query + socket hooks (KDC, lifecycle, PFS, contacts)
+	lib/api.ts            Axios client for REST surface
+	lib/socket.ts         Structured websocket manager
+```
+
+See `package.json`, `vite.config.ts`, and `backend/requirements.txt` for dependency details.
+
+---
+
+## Prerequisites
+
+- Python 3.11+
 - Node.js 18+
-- Windows PowerShell (repo assumes `pwsh`)
+- PowerShell 7+ (commands assume `pwsh` on Windows)
 
-### Environment
+Optional: SQLite Browser for inspecting `cipherlink.db`.
 
-1. Copy `.env.example` to `.env` (already tracked) and confirm:
+---
+
+## Environment Configuration
+
+1. Copy `.env.example` to `.env` (backend reads it automatically) and confirm:
+
 	 ```ini
 	 BACKEND_SECRET=change-me
-	 BACKEND_MOCK_MODE=true      # enables mock OTP + disables SMTP
+	 BACKEND_MOCK_MODE=true        # enables mock OTPs & disables SMTP
 	 DATABASE_URL=sqlite:///./cipherlink.db
 	 VITE_API_URL=http://localhost:8000/api
 	 VITE_WS_URL=ws://localhost:8000/ws
 	 VITE_MOCK_MODE=false
 	 ```
-2. Install backend deps once: `python -m venv .venv && .\.venv\Scripts\Activate.ps1 && pip install -r backend/requirements.txt`
-3. Install frontend deps once: `npm install`
 
-### Run
+2. (Optional) configure SMTP creds + `BACKEND_MOCK_MODE=false` for real OTP delivery.
+3. Ensure `DATABASE_URL` points to a persistent SQLite path if you want history between runs.
+
+---
+
+## Installation
 
 ```powershell
-# Terminal 1 – backend
+# Backend
+python -m venv .venv
+& .\.venv\Scripts\Activate.ps1
+pip install -r backend/requirements.txt
+
+# Frontend
+npm install
+```
+
+> Running `pip install` outside the virtual environment will pollute your global site-packages; always activate `.venv` first.
+
+---
+
+## Running Locally
+
+```powershell
+# Terminal 1 – API + websocket server
 & .\.venv\Scripts\Activate.ps1
 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
@@ -39,72 +94,108 @@ uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 npm run dev
 ```
 
-Open [http://localhost:8080](http://localhost:8080) (Vite dev server) in two separate browser profiles to emulate two people.
+Visit `http://localhost:8080` (Vite dev server). Open two browser profiles to role-play two operators.
 
 ---
 
-## 2. Auth Flow (fixes "credentials don’t match")
+## Core Workflows
 
-1. **Signup** with any email/password. Because `BACKEND_MOCK_MODE=true`, the `/api/auth/signup` response contains `mock_otp`.
-2. **Verify OTP** using the modal or a manual POST to `/api/auth/verify-otp`. No email delivery is required in mock mode.
-3. **Login** from both browser profiles. Successful login gives each client a JWT for API + Socket.IO calls.
+### 1. Authentication & OTP
 
-> If you toggle `BACKEND_MOCK_MODE=false`, configure real SMTP creds or you will never receive OTPs and login will keep failing.
+1. **Signup:** POST `/api/auth/signup`. In mock mode the response contains `mock_otp`.
+2. **Verify:** POST `/api/auth/verify-otp` with the mock OTP or the emailed code.
+3. **Login:** POST `/api/auth/login` to receive a JWT used by REST + Socket.IO clients.
 
----
+> When mock mode is disabled you must configure SMTP or OTP verification will fail.
 
-## 3. Real-Time Messaging Like WhatsApp
+### 2. Contact Linking & KDC
 
-1. Both logged-in clients automatically connect to Socket.IO. We now mount the socket server on **both** `/ws/socket.io` (preferred) and `/socket.io` (compat layer), so even misconfigured clients stay connected.
-2. Add a contact (User A adds User B). This provisions an AES-256 session key via `/api/kdc/request-session-key` and mirrors it to both users.
-3. Use the terminal composer to send a message. `socket_manager.handle_message` persists it, emits blockchain events, and pushes the payload to both sockets instantly.
-4. The `SecurityPanels` + `CryptoLogPanel` surfaces each stage (hashing, AES selection, signature verification, lifecycle events) for transparency.
+- Add a contact in the UI; backend checks `ContactLink` relationships.
+- Hitting `/api/kdc/request-session-key` mints a 32-byte AES key, fingerprints it, encrypts for both peers, stores it, and emits `kdc:new-session-key` events.
+- `/api/kdc/session-info/{id}` returns lifecycle metadata for display in the Debug panel.
 
----
+### 3. Messaging Pipeline
 
-## 4. Persistence & Message History
+1. Client composes a message → `socket_manager` encrypts with the negotiated key.
+2. Message is persisted (with hashes, signatures, contact references) and broadcast via Socket.IO.
+3. Frontend `lib/socket.ts` normalizes the payload, decrypts when possible, and surfaces it in the terminal + crypto logs.
+4. A historical ledger is available via `GET /api/messages/history?peer_id=<id>`.
 
-- All entities (users, contacts, KDCSessions, PFSSessions, lifecycle events, messages) are stored in `cipherlink.db`. Keep that SQLite file and your state survives restarts.
-- A new endpoint `GET /api/messages/history` exposes stored conversations with optional `peer_id`, `limit`, and `offset` filters. Sample request:
-	```bash
-	curl -H "Authorization: Bearer <token>" \
-			 "http://localhost:8000/api/messages/history?peer_id=<userId>&limit=50"
-	```
-- Frontend helper: `fetchMessageHistory(peerId?: string, limit = 100)` in `src/lib/api.ts` for future UI consumption.
-- To snapshot runs, copy `cipherlink.db` elsewhere before shutting down.
+### 4. PFS Handshake
 
----
+- `/api/pfs/start` generates a server ephemeral ECDH key, caches the private key, and emits `pfs:initiated`.
+- `/api/pfs/complete` consumes the client ephemeral public key, derives a shared secret with HKDF, stores fingerprint + expiry, and emits `pfs:established` to both parties.
+- Frontend `usePFS` hook surfaces pending session IDs, last negotiated key, and stats in the Forward Secrecy panel.
 
-## 5. Security Telemetry Cheat Sheet
+### 5. Key Lifecycle Management
 
-- **KDC** — `/api/kdc/request-session-key`, `/api/kdc/session-info/{id}`
-- **Lifecycle** — `/api/lifecycle/rotate-session-key`, `/revoke`, `/destroy` + websocket events `lifecycle:*`
-- **PFS** — `/api/pfs/start` + `/api/pfs/complete` broadcast `pfs:established`
-- **Observability** — `/api/crypto/logs` (filter by `source`), `/api/system/security-status`, new `/api/messages/history`
+- `/api/lifecycle/rotate-session-key`: rotates AES material, extends expiry, emits `lifecycle:rotated` + `kdc:new-session-key` follow-up.
+- `/api/lifecycle/revoke-session-key` / `destroy-session-key`: updates lifecycle state, optionally emits `kdc:key-revoked`.
+- Lifecycle events are written to `KeyEvent` rows and indexed by `CryptoLogPanel`.
 
 ---
 
-## 6. Troubleshooting
+## Frontend Debug Panels
 
-| Symptom | Fix |
-| --- | --- |
-| Login fails with "Invalid credentials" | Ensure OTP verification succeeded (mock OTP) or real SMTP delivers the code. |
-| Socket spam `Expected ASGI message ... but got http.response.start` | Means client is hitting `/socket.io` while backend only served `/ws` – now mitigated by dual mount, but double-check `VITE_WS_URL`. |
-| No messages after restart | Verify `cipherlink.db` still exists and `DATABASE_URL` points to it. |
-| bcrypt import error on Windows | Already patched in `backend/utils/security.py`. |
+- **KDC Panel:** shows total issued/revoked keys, last fingerprint, recent session snapshots, and a real-time event feed.
+- **PFS Panel:** tracks initiated vs established handshakes, pending sessions, and the latest derived key material.
+- **Lifecycle Panel:** aggregates rotations/revocations/destructions and renders a timeline sourced from `/api/lifecycle/key-events`.
+- All panels reuse `CryptoLogPanel` for historical context and refresh automatically via React Query.
 
 ---
 
-## 7. Tests
+## API Highlights
 
-Run backend integration tests:
+| Area | Endpoint | Notes |
+| --- | --- | --- |
+| Auth | `POST /api/auth/signup`, `/verify-otp`, `/login` | OTP flow with mock or SMTP delivery |
+| Contacts | `GET/POST /api/contacts` | Manages contact links required for KDC issuance |
+| Messaging | `GET /api/messages/history` | Historical ledger with pagination |
+| KDC | `POST /api/kdc/request-session-key`, `GET /api/kdc/session-info/{id}` | Issues + inspects session keys |
+| Lifecycle | `POST /api/lifecycle/rotate-session-key`, `/revoke`, `/destroy`, `GET /api/lifecycle/key-events` | Full lifecycle transitions |
+| PFS | `POST /api/pfs/start`, `/pfs/complete` | Ephemeral ECDH handshake |
+| Crypto Logs | `GET /api/crypto/logs?source=KDC` | Filterable audit events |
+| System | `GET /api/system/security-status` | Active sessions, rotations, forward secrecy flag |
+
+All REST routes live under `/api` (set in `backend/main.py`). Socket.IO namespaces emit structured event names described above.
+
+---
+
+## Data Persistence
+
+- SQLite database `cipherlink.db` (or your configured database) stores users, contacts, KDC sessions, lifecycle events, PFS sessions, blockchain-style message blocks, etc.
+- To preserve state between runs, keep the DB file and reuse the same `.env`.
+- For quick backups: copy `cipherlink.db` before shutting down the backend.
+
+---
+
+## Testing
 
 ```powershell
 & .\.venv\Scripts\Activate.ps1
 python -m pytest backend/tests/test_app.py
 ```
 
+Add more suites under `backend/tests/` as you extend modules.
+
 ---
 
-Feel free to extend the docs with architecture diagrams or API references as the system evolves. The current content emphasizes the workflows you asked for: reliable login, WhatsApp-style real-time messaging, and durable history between runs.
-# CipherLink
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+| --- | --- | --- |
+| "Invalid credentials" during login | OTP never verified | Complete `/api/auth/verify-otp` (mock OTP in response) or configure SMTP in production mode |
+| Socket errors `Expected ASGI message ...` | Client hitting `/socket.io` when server only exposed `/ws` | Ensure `VITE_WS_URL=ws://localhost:8000/ws`; backend already mirrors `/socket.io` for compatibility |
+| No chat history after restart | Database recreated | Point `DATABASE_URL` to a persistent path and do not delete `cipherlink.db` |
+| bcrypt import failure on Windows | Old binaries cached | Reinstall requirements after cleaning `.venv` (already mitigated via vendor patch) |
+| OTP emails never arrive | Mock mode disabled without SMTP | Re-enable mock mode or configure SMTP credentials |
+
+---
+
+## Next Steps
+
+- Document WebSocket payload schemas in an ADR-style doc if you need strict external integrations.
+- Add Cypress/Playwright specs for end-to-end registration + messaging flows.
+- Consider Dockerizing backend/frontend for reproducible deployments.
+
+CipherLink OS now ships with a complete story: onboarding, encrypted chats, live telemetry, and persistent audit trails. Feel free to iterate, extend, or rebrand as needed.
