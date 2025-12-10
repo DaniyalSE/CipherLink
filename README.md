@@ -607,7 +607,7 @@ SOFTWARE.
 ╚════════════════════════════════════════════════════════════╝
 ```
 
-**Made with 💚 and ☕ by the CipherLink Team**
+**Made with ☕ by the Syed Daniyal Haider Naqvi**
 
 *Encrypting the future, one message at a time.*
 
