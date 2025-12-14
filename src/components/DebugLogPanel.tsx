@@ -72,7 +72,7 @@ const DebugLogPanel: React.FC = () => {
       case 'error':
         return <AlertCircle className="w-3 h-3 text-destructive" />;
       case 'ping':
-        return <Activity className="w-3 h-3 text-terminal-amber" />;
+        return <Activity className="w-3 h-3 text-terminal-green" />;
       case 'system':
         return <Bug className="w-3 h-3 text-muted-foreground" />;
       default:
@@ -83,18 +83,21 @@ const DebugLogPanel: React.FC = () => {
   const getLogColor = (type: DebugLog['type']) => {
     switch (type) {
       case 'connect':
-        return 'text-primary';
+        return 'text-terminal-green';
       case 'disconnect':
+        return 'text-destructive';
       case 'error':
         return 'text-destructive';
       case 'message':
-        return 'text-accent';
+        return 'text-terminal-cyan';
       case 'presence':
         return 'text-terminal-cyan';
       case 'ping':
-        return 'text-terminal-amber';
+        return 'text-terminal-green';
+      case 'system':
+        return 'text-terminal-green';
       default:
-        return 'text-muted-foreground';
+        return 'text-terminal-green';
     }
   };
 
@@ -126,7 +129,7 @@ const DebugLogPanel: React.FC = () => {
             variant="ghost"
             size="sm"
             onClick={() => setIsPaused(!isPaused)}
-            className={isPaused ? 'text-terminal-amber' : 'text-muted-foreground'}
+            className={isPaused ? 'text-terminal-green' : 'text-muted-foreground'}
             title={isPaused ? 'Resume logging' : 'Pause logging'}
           >
             {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
@@ -171,62 +174,59 @@ const DebugLogPanel: React.FC = () => {
 
       {/* Paused indicator */}
       {isPaused && (
-        <div className="mb-2 p-2 bg-terminal-amber/10 border border-terminal-amber/30 rounded text-xs text-terminal-amber text-center">
-          Logging paused - new events will not be captured
+        <div className="mb-2 p-1.5 bg-terminal-green/10 border border-terminal-green/30 rounded text-[10px] text-terminal-green text-center">
+          ⏸ Logging paused - new events will not be captured
         </div>
       )}
 
       {/* Log stream */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto terminal-body rounded-lg p-3 font-mono text-xs"
+        className="flex-1 overflow-y-auto terminal-body rounded-lg p-2 font-mono text-[10px] leading-relaxed"
       >
         {filteredLogs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-terminal-green/60">
             <Bug className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>No logs yet</p>
-            <p className="text-xs mt-1">Events will appear here in real-time</p>
+            <p className="text-[10px]">No logs yet</p>
+            <p className="text-[9px] mt-1 text-terminal-green/40">Events will appear here in real-time</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {filteredLogs.map((log, index) => (
               <motion.div
                 key={log.id}
                 initial={{ opacity: 0, x: -5 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="group"
+                className="group hover:bg-terminal-green/5 transition-colors rounded px-1 py-0.5"
               >
-                <div className="flex items-start gap-2">
-                  {/* Timestamp */}
-                  <span className="text-muted-foreground whitespace-nowrap">
-                    [{log.timestamp.toLocaleTimeString('en-US', {
+                <div className="flex items-start gap-1.5 flex-wrap">
+                  {/* Timestamp - compact format */}
+                  <span className="text-terminal-green/70 whitespace-nowrap text-[9px]">
+                    {log.timestamp.toLocaleTimeString('en-US', {
                       hour: '2-digit',
                       minute: '2-digit',
                       second: '2-digit',
                       hour12: false,
-                    })}]
+                    })}
                   </span>
 
-                  {/* Type icon */}
-                  {getLogIcon(log.type)}
-
-                  {/* Type label */}
-                  <span className={`uppercase font-bold ${getLogColor(log.type)}`}>
-                    [{log.type}]
+                  {/* Type label - compact */}
+                  <span className={`uppercase font-semibold ${getLogColor(log.type)} text-[9px] tracking-wide`}>
+                    {log.type}
                   </span>
 
-                  {/* Data */}
-                  <span className="text-foreground break-all">{log.data}</span>
+                  {/* Data - terminal green */}
+                  <span className="text-terminal-green/90 break-all flex-1 min-w-0">{log.data}</span>
                 </div>
 
-                {/* Raw data (expandable) */}
+                {/* Raw data (expandable) - more compact */}
                 {log.raw && (
-                  <details className="ml-[140px] mt-1 text-muted-foreground">
-                    <summary className="cursor-pointer hover:text-foreground text-[10px]">
-                      View raw data
+                  <details className="ml-0 mt-0.5 text-terminal-green/60">
+                    <summary className="cursor-pointer hover:text-terminal-green text-[9px]">
+                      [raw]
                     </summary>
-                    <pre className="mt-1 p-2 bg-secondary/50 rounded text-[10px] overflow-x-auto">
-                      {JSON.stringify(log.raw, null, 2)}
+                    <pre className="mt-1 p-1.5 bg-black/30 border border-terminal-green/20 rounded text-[9px] overflow-x-auto text-terminal-green/80 font-mono">
+                      {JSON.stringify(log.raw, null, 1)}
                     </pre>
                   </details>
                 )}

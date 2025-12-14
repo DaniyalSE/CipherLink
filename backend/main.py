@@ -1,5 +1,7 @@
 """FastAPI application factory and main entrypoint."""
 
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,9 +15,13 @@ from backend.services.email_service import email_service
 from backend.services.socket_manager import socket_manager
 from backend.websocket import chat  # noqa: F401 - register socket events
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 database.Base.metadata.create_all(bind=database.engine)
+logger.info(f"Database initialized. Environment: {settings.environment}")
+logger.info(f"SMTP configured: {settings.smtp_host is not None}")
+logger.info(f"Mock mode: {settings.backend_mock_mode}")
 
 app = FastAPI(
     title=settings.app_name,

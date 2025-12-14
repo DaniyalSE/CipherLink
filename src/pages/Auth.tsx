@@ -39,6 +39,7 @@ const Auth: React.FC = () => {
   const [pendingEmail, setPendingEmail] = useState('');
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [mockOtp, setMockOtp] = useState<string | null>(null);
 
   const { setUser } = useAuth();
   const navigate = useNavigate();
@@ -75,10 +76,21 @@ const Auth: React.FC = () => {
           setPendingEmail(data.email);
           setShowOTPModal(true);
           setOtpCooldown(60);
-          toast({
-            title: 'OTP Sent',
-            description: 'Check your email for the verification code.',
-          });
+          // If mock OTP is provided (mock mode or no SMTP), store it and show it
+          if (response.mock_otp) {
+            setMockOtp(response.mock_otp);
+            toast({
+              title: 'OTP Generated',
+              description: `Your verification code is: ${response.mock_otp}`,
+              duration: 10000,
+            });
+          } else {
+            setMockOtp(null);
+            toast({
+              title: 'OTP Sent',
+              description: 'Check your email for the verification code.',
+            });
+          }
         }
       } else {
         const response = await login({ 
@@ -148,10 +160,20 @@ const Auth: React.FC = () => {
       const response = await resendOTP(pendingEmail);
       if (response.success) {
         setOtpCooldown(response.retry_after_seconds);
-        toast({
-          title: 'OTP Resent',
-          description: 'Check your email for the new code.',
-        });
+        // If mock OTP is provided, store it and show it
+        if (response.mock_otp) {
+          setMockOtp(response.mock_otp);
+          toast({
+            title: 'OTP Resent',
+            description: `Your new verification code is: ${response.mock_otp}`,
+            duration: 10000,
+          });
+        } else {
+          toast({
+            title: 'OTP Resent',
+            description: 'Check your email for the new code.',
+          });
+        }
       }
     } catch (error: any) {
       // Extract error message from API response
@@ -392,6 +414,19 @@ const Auth: React.FC = () => {
                   Enter the 6-digit code sent to <span className="text-primary">{pendingEmail}</span>
                 </p>
 
+                {/* Show mock OTP if available */}
+                {mockOtp && (
+                  <div className="mb-4 p-3 bg-terminal-green/10 border border-terminal-green/30 rounded-lg">
+                    <p className="text-xs text-terminal-green/80 mb-1">Development Mode - OTP Code:</p>
+                    <p className="text-2xl font-mono font-bold text-terminal-green text-center tracking-widest">
+                      {mockOtp}
+                    </p>
+                    <p className="text-xs text-terminal-green/60 mt-1 text-center">
+                      (This code is shown because email is not configured)
+                    </p>
+                  </div>
+                )}
+
                 <form onSubmit={handleOTPSubmit(onOTPSubmit)} className="space-y-4">
                   <div>
                     <Input
@@ -438,6 +473,7 @@ const Auth: React.FC = () => {
                     onClick={() => {
                       setShowOTPModal(false);
                       resetOTP();
+                      setMockOtp(null);
                     }}
                     className="w-full text-muted-foreground text-sm hover:text-foreground"
                   >

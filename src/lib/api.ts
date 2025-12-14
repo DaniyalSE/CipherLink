@@ -108,6 +108,7 @@ export interface SignupResponse {
   success: boolean;
   next: 'verify';
   message?: string;
+  mock_otp?: string;
 }
 
 export interface VerifyOTPRequest {
@@ -144,6 +145,7 @@ export interface LoginResponse {
 export interface ResendOTPResponse {
   success: boolean;
   retry_after_seconds: number;
+  mock_otp?: string;
 }
 
 export interface KeypairResponse {
@@ -478,6 +480,32 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
     };
   }
   const response = await api.get<KeypairResponse>('/keypair');
+  return response.data;
+};
+
+// ============================================
+// ACCOUNT MANAGEMENT
+// ============================================
+
+export interface DeleteAccountRequest {
+  password: string;
+  confirm: boolean;
+}
+
+export interface DeleteAccountResponse {
+  message: string;
+}
+
+/**
+ * Delete the current user's account and all associated data
+ */
+export const deleteAccount = async (data: DeleteAccountRequest): Promise<DeleteAccountResponse> => {
+  if (isMockMode) {
+    await mockDelay(500);
+    console.log('[MOCK API] Account deletion requested');
+    return { message: 'Account and all associated data have been deleted successfully' };
+  }
+  const response = await api.post<DeleteAccountResponse>('/users/me/delete', data);
   return response.data;
 };
 

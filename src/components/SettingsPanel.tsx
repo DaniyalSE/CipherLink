@@ -5,16 +5,20 @@
  * Settings are persisted to localStorage.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   Settings, Palette, Type, Zap, Volume2, Monitor, 
-  RotateCcw, Key, Shield, AlertTriangle, ExternalLink 
+  RotateCcw, Key, Shield, AlertTriangle, ExternalLink, Trash2
 } from 'lucide-react';
 import { useSettings, ThemeColor } from '@/lib/settings-context';
+import { deleteAccount, logout } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 
 interface SettingsPanelProps {
   onGenerateKeypair: () => void;
@@ -22,6 +26,12 @@ interface SettingsPanelProps {
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ onGenerateKeypair }) => {
   const { settings, updateSettings, resetSettings } = useSettings();
+  const [showDeleteForm, setShowDeleteForm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const themeColors: { value: ThemeColor; label: string; color: string }[] = [
     { value: 'green', label: 'Matrix Green', color: 'bg-green-500' },
@@ -196,6 +206,148 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ onGenerateKeypair }) => {
             </div>
           </div>
         </div>
+      </SettingsSection>
+
+      {/* Account Management Section */}
+      <SettingsSection icon={Trash2} title="Account Management">
+        {!showDeleteForm ? (
+          <div className="space-y-3">
+            <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-destructive mb-2">Danger Zone</p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Deleting your account will permanently remove all your data including:
+                  </p>
+                  <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>All messages and conversation history</li>
+                    <li>All contacts and session keys</li>
+                    <li>All KDC and PFS sessions</li>
+                    <li>All key lifecycle events</li>
+                    <li>Your encryption keypairs</li>
+                  </ul>
+                  <p className="text-xs text-destructive mt-3 font-medium">
+                    This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowDeleteForm(true)}
+              variant="destructive"
+              className="w-full"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete My Account
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <p className="text-sm text-destructive font-medium mb-2">
+                Confirm Account Deletion
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Please enter your password to confirm account deletion.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="delete-password" className="text-muted-foreground">
+                  Password
+                </Label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="mt-1"
+                  disabled={isDeleting}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="delete-confirm"
+                  checked={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.checked)}
+                  disabled={isDeleting}
+                  className="rounded border-border bg-input"
+                />
+                <Label htmlFor="delete-confirm" className="text-sm cursor-pointer">
+                  I understand this action is permanent and cannot be undone
+                </Label>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  setShowDeleteForm(false);
+                  setDeletePassword('');
+                  setDeleteConfirm(false);
+                }}
+                variant="ghost"
+                className="flex-1"
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!deletePassword) {
+                    toast({
+                      title: 'Password Required',
+                      description: 'Please enter your password to delete your account.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+                  if (!deleteConfirm) {
+                    toast({
+                      title: 'Confirmation Required',
+                      description: 'Please confirm that you understand this action is permanent.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+
+                  setIsDeleting(true);
+                  try {
+                    await deleteAccount({
+                      password: deletePassword,
+                      confirm: deleteConfirm,
+                    });
+                    toast({
+                      title: 'Account Deleted',
+                      description: 'Your account and all associated data have been permanently deleted.',
+                    });
+                    logout();
+                    navigate('/auth');
+                  } catch (error: any) {
+                    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to delete account';
+                    toast({
+                      title: 'Deletion Failed',
+                      description: errorMessage,
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                variant="destructive"
+                className="flex-1"
+                disabled={isDeleting || !deletePassword || !deleteConfirm}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Account'}
+              </Button>
+            </div>
+          </div>
+        )}
       </SettingsSection>
 
       {/* Actions */}

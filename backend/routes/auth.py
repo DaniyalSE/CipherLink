@@ -92,7 +92,8 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> SignupRespo
     email_service.send_otp_email(email, otp_record.code)
 
     response = SignupResponse(success=True, message="OTP sent to email", next="verify")
-    if settings.backend_mock_mode:
+    # Return OTP in response if in mock mode or SMTP is not configured
+    if settings.backend_mock_mode or not settings.smtp_host:
         response.mock_otp = otp_record.code
     return response
 
@@ -156,7 +157,8 @@ def resend_otp(payload: ResendOtpRequest, db: Session = Depends(get_db)) -> Rese
     email_service.send_otp_email(email, record.code)
 
     response = ResendOtpResponse(success=True, retry_after_seconds=settings.otp_resend_cooldown_seconds)
-    if settings.backend_mock_mode:
+    # Return OTP in response if in mock mode or SMTP is not configured
+    if settings.backend_mock_mode or not settings.smtp_host:
         response.mock_otp = record.code
     return response
 

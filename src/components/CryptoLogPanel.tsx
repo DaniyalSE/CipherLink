@@ -12,12 +12,12 @@ interface CryptoLogPanelProps {
 
 const sourceColors: Record<string, string> = {
   KDC: 'text-terminal-cyan',
-  PFS: 'text-terminal-amber',
-  LIFECYCLE: 'text-primary',
-  AES: 'text-accent',
+  PFS: 'text-terminal-green',
+  LIFECYCLE: 'text-terminal-green',
+  AES: 'text-terminal-cyan',
   RSA: 'text-terminal-green',
-  DH: 'text-terminal-blue',
-  OTP: 'text-terminal-amber',
+  DH: 'text-terminal-cyan',
+  OTP: 'text-terminal-green',
 };
 
 const formatTimestamp = (value: string): string => {
@@ -51,14 +51,14 @@ const CryptoLogPanel: React.FC<CryptoLogPanelProps> = ({ title, sources, autoRef
       {error && <p className="text-xs text-destructive">Unable to load logs.</p>}
 
       <ScrollArea className="max-h-64">
-        <div className="space-y-3">
+        <div className="space-y-2">
           {(data ?? []).map((entry) => (
-            <div key={entry.id} className="rounded border border-border/50 p-3 bg-background/60">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className={`${sourceColors[entry.source] ?? 'text-muted-foreground'} font-semibold`}>
+            <div key={entry.id} className="rounded border border-terminal-green/20 p-2 bg-black/20 hover:bg-black/30 transition-colors">
+              <div className="flex items-center justify-between text-[10px] mb-1">
+                <span className={`${sourceColors[entry.source] ?? 'text-terminal-green'} font-semibold`}>
                   [{entry.source}] {entry.eventType}
                 </span>
-                <span className="text-muted-foreground">{formatTimestamp(entry.createdAt)}</span>
+                <span className="text-terminal-green/60">{formatTimestamp(entry.createdAt)}</span>
               </div>
               {/* Highlight keys/fingerprints/sessionKeyBase64 if present */}
               {(() => {
@@ -67,7 +67,7 @@ const CryptoLogPanel: React.FC<CryptoLogPanelProps> = ({ title, sources, autoRef
                 if (key) {
                   return (
                     <div className="mb-1">
-                      <span className="inline-block rounded bg-terminal-cyan/10 text-terminal-cyan px-2 py-1 text-[11px] font-mono break-all">
+                      <span className="inline-block rounded bg-terminal-green/10 border border-terminal-green/20 text-terminal-green px-1.5 py-0.5 text-[9px] font-mono break-all">
                         {payload.sessionKeyBase64 && 'Session Key: '}
                         {payload.key && 'Key: '}
                         {payload.fingerprint && 'Fingerprint: '}
@@ -78,13 +78,13 @@ const CryptoLogPanel: React.FC<CryptoLogPanelProps> = ({ title, sources, autoRef
                 }
                 return null;
               })()}
-              <pre className="text-[11px] leading-tight text-muted-foreground whitespace-pre-wrap break-all">
-                {JSON.stringify(entry.payload ?? {}, null, 2)}
+              <pre className="text-[9px] leading-tight text-terminal-green/80 whitespace-pre-wrap break-all font-mono">
+                {JSON.stringify(entry.payload ?? {}, null, 1)}
               </pre>
             </div>
           ))}
           {!isLoading && data?.length === 0 && (
-            <p className="text-xs text-muted-foreground">No events recorded for these sources.</p>
+            <p className="text-[10px] text-terminal-green/60">No events recorded for these sources.</p>
           )}
         </div>
       </ScrollArea>
