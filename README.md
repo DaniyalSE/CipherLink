@@ -341,6 +341,89 @@ POST /api/pfs/complete
 
 ---
 
+### 🔒 Perfect Forward Secrecy (PFS)
+
+Forward secrecy ensures that compromise of long-term keys cannot decrypt past communications:
+
+**Ephemeral Key Exchange:**
+- Elliptic Curve Diffie-Hellman (ECDH) using Curve25519
+- New ephemeral key pair generated for each session
+- Private keys destroyed immediately after deriving shared secret
+- Session keys derived using HKDF from ECDH shared secret
+
+**Ratcheting Mechanism:**
+- Double Ratchet algorithm inspired by Signal Protocol
+- Symmetric key ratchet: keys derive new keys after each message
+- Asymmetric key ratchet: new ECDH exchange periodically
+- Message keys deleted after decryption
+- Compromise of current keys doesn't reveal past messages
+
+**PFS Workflow:**
+```
+1. Client A generates ephemeral keypair (SK_A, PK_A)
+2. Server generates ephemeral keypair (SK_S, PK_S)
+3. Both exchange public keys
+4. Shared secret = ECDH(SK_A, PK_S) = ECDH(SK_S, PK_A)
+5. Session key = HKDF(shared_secret, context)
+6. Ephemeral private keys SK_A, SK_S immediately destroyed
+7. After N messages or T time, repeat from step 1
+```
+
+**Security Properties:**
+- **Forward Secrecy:** Past messages remain secure if long-term keys compromised
+- **Break-in Recovery:** Future messages secure after attacker loses access
+- **Deniability:** No cryptographic proof of who sent messages
+- **Replay Protection:** Message counters prevent replay attacks
+
+### ⛓️ Blockchain Integration
+
+CipherLink implements a private blockchain for message integrity and auditability:
+
+**Message Blockchain Structure:**
+```
+Block N:
+├── Block Hash (SHA-256)
+├── Previous Block Hash
+├── Timestamp
+├── Message Data (encrypted)
+├── Sender ID (hashed)
+├── Recipient ID (hashed)
+├── Digital Signature (ECDSA)
+├── Nonce
+└── Merkle Root (for multiple messages)
+```
+
+**Blockchain Features:**
+- **Immutability:** Each block cryptographically links to previous block
+- **Tamper Detection:** Any modification invalidates entire chain
+- **Distributed Verification:** Multiple nodes can verify chain integrity
+- **Pruning Support:** Archive old blocks while maintaining chain integrity
+- **Smart Contracts:** Future support for automated key rotation policies
+
+**Message Integrity Verification:**
+1. Message encrypted with AES-256-GCM
+2. Message hash computed (SHA-256)
+3. Hash signed with sender's ECDSA private key
+4. Block created containing encrypted message + metadata
+5. Block hash links to previous block hash
+6. Block added to chain after verification
+
+**Blockchain API Endpoints:**
+- `GET /api/blockchain/chain` - Retrieve full message chain
+- `GET /api/blockchain/verify` - Verify chain integrity
+- `GET /api/blockchain/block/{hash}` - Get specific block
+- `POST /api/blockchain/validate-signature` - Verify message signature
+- `GET /api/blockchain/audit-trail/{user_id}` - Get user's message history
+
+**Benefits:**
+- Provides non-repudiation for messages
+- Creates auditable, tamper-proof message history
+- Enables forensic analysis of communication patterns
+- Supports regulatory compliance requirements
+- Allows distributed trust without central authority
+
+---
+
 ## 🎨 **TERMINAL INTERFACE**
 
 <div align="center">
