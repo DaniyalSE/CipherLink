@@ -41,10 +41,24 @@ def add_block(payload: AddBlockRequest, db: Session = Depends(get_db), current_u
 
 @router.get("/blockchain/validate")
 def validate_chain(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
-    valid, details = engine.validate_chain(db)
-    return {"valid": valid, "details": details}
+    valid, issues = engine.validate_chain(db)
+    return {
+        "valid": valid,
+        "issues": issues,
+        "details": issues,  # Keep for backward compatibility
+        "message": ("Blockchain is valid and untampered." if valid else f"Integrity compromised: {issues}")
+    }
 
 
 @router.get("/blockchain/get-chain")
 def get_chain(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict:
     return {"chain_array": engine.chain_as_dict(db)}
+
+
+@router.get("/blockchain/chain")
+def get_blockchain_chain(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    """Get the blockchain chain as a list of blocks."""
+    return engine.chain_as_dict(db)
