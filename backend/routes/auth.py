@@ -73,7 +73,7 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> SignupRespo
     user = db.query(User).filter(User.email == email).first()
 
     if user and user.is_verified:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account already exists")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Account is already registered")
 
     if not user:
         user = User(

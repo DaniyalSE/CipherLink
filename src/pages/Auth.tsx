@@ -95,10 +95,12 @@ const Auth: React.FC = () => {
           navigate('/terminal');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Extract error message from API response
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Invalid credentials or server error.';
       toast({
-        title: 'Authentication Failed',
-        description: 'Invalid credentials or server error.',
+        title: mode === 'signup' ? 'Signup Failed' : 'Authentication Failed',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -126,10 +128,12 @@ const Auth: React.FC = () => {
           variant: 'destructive',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Extract error message from API response
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Please try again.';
       toast({
         title: 'Verification Failed',
-        description: 'Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -149,10 +153,12 @@ const Auth: React.FC = () => {
           description: 'Check your email for the new code.',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Extract error message from API response
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Please try again later.';
       toast({
         title: 'Failed to resend',
-        description: 'Please try again later.',
+        description: errorMessage,
         variant: 'destructive',
       });
     }

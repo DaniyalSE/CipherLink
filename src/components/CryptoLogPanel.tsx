@@ -60,6 +60,24 @@ const CryptoLogPanel: React.FC<CryptoLogPanelProps> = ({ title, sources, autoRef
                 </span>
                 <span className="text-muted-foreground">{formatTimestamp(entry.createdAt)}</span>
               </div>
+              {/* Highlight keys/fingerprints/sessionKeyBase64 if present */}
+              {(() => {
+                const payload = entry.payload ?? {};
+                const key = payload.sessionKeyBase64 || payload.key || payload.fingerprint;
+                if (key) {
+                  return (
+                    <div className="mb-1">
+                      <span className="inline-block rounded bg-terminal-cyan/10 text-terminal-cyan px-2 py-1 text-[11px] font-mono break-all">
+                        {payload.sessionKeyBase64 && 'Session Key: '}
+                        {payload.key && 'Key: '}
+                        {payload.fingerprint && 'Fingerprint: '}
+                        {String(key)}
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <pre className="text-[11px] leading-tight text-muted-foreground whitespace-pre-wrap break-all">
                 {JSON.stringify(entry.payload ?? {}, null, 2)}
               </pre>

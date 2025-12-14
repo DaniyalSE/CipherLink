@@ -22,6 +22,8 @@ import DebugLogPanel from '@/components/DebugLogPanel';
 import SettingsPanel from '@/components/SettingsPanel';
 import MessageStream from '@/components/MessageStream';
 import SecurityPanels from '@/components/SecurityPanels';
+import BlockchainPanel from '@/components/BlockchainPanel';
+import BlockchainIntegrityPanel from '@/components/BlockchainIntegrityPanel';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useContacts } from '@/hooks/use-contacts';
@@ -383,14 +385,14 @@ Fingerprint: ${keypair.publicKeyFingerprint}
               <div className="flex justify-end gap-2 mt-3">
                 <Button
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   onClick={() => dismissNotification(note.id)}
                 >
                   Dismiss
                 </Button>
                 {note.contactLinkId && (
                   <Button
-                    size="xs"
+                    size="sm"
                     onClick={() => {
                       const target = contacts.find(contact => contact.linkId === note.contactLinkId);
                       if (target) {
@@ -566,10 +568,13 @@ Fingerprint: ${keypair.publicKeyFingerprint}
                 exit={{ opacity: 0, x: -20 }}
                 className="h-full"
               >
-                <div className="h-full grid gap-4 lg:grid-cols-2">
+                <div className="h-full grid gap-4 lg:grid-cols-4">
                   <SecurityPanels />
                   <DebugLogPanel />
+                  <BlockchainPanel />
+                  <BlockchainIntegrityPanel />
                 </div>
+              import BlockchainIntegrityPanel from '@/components/BlockchainIntegrityPanel';
               </motion.div>
             )}
 
